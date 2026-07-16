@@ -1,0 +1,5 @@
+aws_region         = "us-east-1"
+environment        = "dev"
+gpu_instance_type  = "g4dn.xlarge"
+image_tag          = "latest"
+# api_key          = "replace-me"  # optional; auto-generated if omitted
