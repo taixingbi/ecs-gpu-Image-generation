@@ -82,8 +82,10 @@ resource "aws_autoscaling_group" "gpu" {
   }
 }
 
+# NOTE: ECS capacity provider names cannot start with "aws", "ecs", or "fargate",
+# so this does not use local.name_prefix (which is "ecs-gpu-diffusers").
 resource "aws_ecs_capacity_provider" "gpu" {
-  name = "${local.name_prefix}-gpu-cp"
+  name = "gpu-diffusers-cp"
 
   auto_scaling_group_provider {
     auto_scaling_group_arn         = aws_autoscaling_group.gpu.arn
