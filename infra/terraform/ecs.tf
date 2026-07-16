@@ -53,6 +53,7 @@ resource "aws_ecs_task_definition" "api" {
       ]
       environment = [
         { name = "MODEL_ID", value = "stabilityai/sdxl-turbo" },
+        { name = "MODEL_DIR", value = local.model_container_dir },
         { name = "HF_HOME", value = "/models/huggingface" },
         { name = "TORCH_HOME", value = "/models/torch" },
         { name = "AWS_REGION", value = var.aws_region },

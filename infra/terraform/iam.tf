@@ -35,6 +35,33 @@ resource "aws_iam_role_policy_attachment" "ecs_instance_ssm" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
 
+# Allow the GPU instance to sync model weights from S3 at boot (user_data).
+resource "aws_iam_role_policy" "ecs_instance_model_s3" {
+  name = "${local.name_prefix}-ecs-instance-model-s3"
+  role = aws_iam_role.ecs_instance.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["s3:GetObject"]
+        Resource = "${aws_s3_bucket.output.arn}/${local.model_prefix}/*"
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["s3:ListBucket"]
+        Resource = aws_s3_bucket.output.arn
+        Condition = {
+          StringLike = {
+            "s3:prefix" = ["${local.model_prefix}/*"]
+          }
+        }
+      }
+    ]
+  })
+}
+
 resource "aws_iam_instance_profile" "ecs_instance" {
   name = "${local.name_prefix}-ecs-instance-profile"
   role = aws_iam_role.ecs_instance.name

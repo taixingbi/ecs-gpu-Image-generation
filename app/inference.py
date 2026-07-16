@@ -6,6 +6,9 @@ from typing import Any, Optional
 logger = logging.getLogger(__name__)
 
 MODEL_ID = os.getenv("MODEL_ID", "stabilityai/sdxl-turbo")
+# When set and present on disk, weights are loaded from this local directory
+# (staged from S3 at instance boot) instead of downloading from Hugging Face.
+MODEL_DIR = os.getenv("MODEL_DIR", "")
 
 _pipeline = None
 _model_ready = False
@@ -53,9 +56,19 @@ def load_pipeline() -> None:
         if not torch.cuda.is_available():
             raise RuntimeError("CUDA is not available")
 
-        logger.info("Loading model %s (fp16) onto CUDA", MODEL_ID)
+        use_local = bool(MODEL_DIR) and os.path.isdir(MODEL_DIR)
+        if use_local:
+            # Avoid any network calls to the Hub when loading local weights.
+            os.environ.setdefault("HF_HUB_OFFLINE", "1")
+            os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
+            model_source = MODEL_DIR
+            logger.info("Loading model from local dir %s (fp16) onto CUDA", MODEL_DIR)
+        else:
+            model_source = MODEL_ID
+            logger.info("Loading model %s (fp16) from Hugging Face onto CUDA", MODEL_ID)
+
         pipeline = AutoPipelineForText2Image.from_pretrained(
-            MODEL_ID,
+            model_source,
             torch_dtype=torch.float16,
             variant="fp16",
         )

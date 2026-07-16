@@ -12,6 +12,7 @@ env:
   ECS_SERVICE: sdxl-turbo-api
   ECS_TASK_FAMILY: sdxl-turbo-api
   CONTAINER_NAME: sdxl-turbo-api
+  MODEL_PREFIX: models/sdxl-turbo
 
 jobs:
   test:
@@ -49,6 +50,17 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
+
+      - name: Verify model weights are staged in S3
+        run: |
+          ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
+          BUCKET="ecs-gpu-diffusers-output-${ACCOUNT_ID}"
+          S3_URI="s3://${BUCKET}/${MODEL_PREFIX}/"
+          if aws s3 ls "$S3_URI" --region "$AWS_REGION" | grep -q .; then
+            echo "Model weights found at $S3_URI"
+          else
+            echo "::warning title=Model not staged in S3::No objects at ${S3_URI}. Task will fall back to a Hugging Face download at boot (slower, uses NAT). Run ./scripts/seed-model.sh to stage weights."
+          fi
 
       - name: Login to Amazon ECR
         id: ecr

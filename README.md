@@ -112,6 +112,33 @@ terraform output -raw api_key
 
 First apply creates ECR/cluster/ASG/ALB/service. The task may fail to pull until the first image exists — that is expected.
 
+## Model weights (staged in S3)
+
+Instead of every GPU instance downloading `stabilityai/sdxl-turbo` from Hugging Face over the NAT gateway, the weights are staged once in S3 and each instance syncs them locally at boot:
+
+```
+Hugging Face ──(seed once)──► S3 (models/sdxl-turbo/) ──(instance boot sync via S3 gateway endpoint)──► /opt/models/sdxl-turbo ──► container /models/sdxl-turbo
+```
+
+Seed the bucket **once** (needs internet + AWS credentials), after `terraform apply`:
+
+```bash
+./scripts/seed-model.sh                 # bucket auto-detected from terraform output
+# or: ./scripts/seed-model.sh <bucket>
+```
+
+How it works:
+
+- `scripts/seed-model.sh` downloads the HF snapshot and uploads it to `s3://<output-bucket>/models/sdxl-turbo/` (see `terraform output model_s3_uri`).
+- GPU instance `user_data` runs `aws s3 sync` from that prefix into `/opt/models/sdxl-turbo` at boot (free/in-region via the S3 gateway endpoint).
+- The container gets `MODEL_DIR=/models/sdxl-turbo`; `app/inference.py` loads from that local dir (with `HF_HUB_OFFLINE=1`) when it exists, and **falls back to a Hugging Face download** if the prefix hasn't been seeded.
+
+If an instance is already running when you seed (or re-seed), trigger an ASG instance refresh so it re-runs `user_data`:
+
+```bash
+aws autoscaling start-instance-refresh --auto-scaling-group-name ecs-gpu-diffusers-gpu-asg
+```
+
 ## CD (push to `main`)
 
 GitHub Actions [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml):
@@ -151,7 +178,7 @@ curl -s -X POST "$ALB/v1/images/generations" \
 ```
 
 ## Tear down everything
-
++
 Removes ECS service (scaled to 0), empties S3/ECR, then `terraform destroy` for the full stack (VPC, ALB, g4dn ASG, IAM, logs, etc.):
 
 ```bash

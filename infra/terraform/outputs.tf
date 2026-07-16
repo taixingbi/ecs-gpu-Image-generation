@@ -18,6 +18,11 @@ output "output_bucket" {
   value       = aws_s3_bucket.output.id
 }
 
+output "model_s3_uri" {
+  description = "S3 URI where model weights are staged (see scripts/seed-model.sh)"
+  value       = local.model_s3_uri
+}
+
 output "ecs_cluster_name" {
   description = "ECS cluster name"
   value       = aws_ecs_cluster.main.name

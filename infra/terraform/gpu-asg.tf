@@ -30,6 +30,16 @@ resource "aws_launch_template" "gpu" {
     set -eux
     mkdir -p /opt/models
     chmod 777 /opt/models
+
+    # Pre-seed model weights from S3 so the container loads them locally instead
+    # of downloading from Hugging Face. Non-fatal if the prefix is not populated
+    # yet; the app falls back to a Hugging Face download in that case.
+    if aws s3 ls "${local.model_s3_uri}/" --region ${var.aws_region} >/dev/null 2>&1; then
+      mkdir -p ${local.model_host_dir}
+      aws s3 sync "${local.model_s3_uri}/" ${local.model_host_dir}/ --region ${var.aws_region} --only-show-errors
+      chmod -R 777 ${local.model_host_dir}
+    fi
+
     echo "ECS_CLUSTER=${local.cluster_name}" >> /etc/ecs/ecs.config
     echo "ECS_ENABLE_GPU_SUPPORT=true" >> /etc/ecs/ecs.config
   EOF
