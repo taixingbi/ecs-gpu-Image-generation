@@ -150,6 +150,17 @@ curl -s -X POST "$ALB/v1/images/generations" \
   -d '{"prompt":"A futuristic GPU data center at night","seed":42}'
 ```
 
+## Tear down everything
+
+Removes ECS service (scaled to 0), empties S3/ECR, then `terraform destroy` for the full stack (VPC, ALB, g4dn ASG, IAM, logs, etc.):
+
+```bash
+./scripts/destroy-all.sh           # type 'destroy' to confirm
+./scripts/destroy-all.sh --yes     # no prompt
+```
+
+Requires `aws` + `terraform` and credentials for the account/region (`AWS_REGION` defaults to `us-east-1`).
+
 ## MVP limits
 
 - 1 GPU instance, 1 ECS task, 1 model
