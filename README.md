@@ -72,7 +72,7 @@ Defaults: `num_inference_steps=1`, `guidance_scale=0.0`, `512×512`. Concurrent 
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 export API_KEY=dev-key
-export OUTPUT_BUCKET=  # leave empty only if you mock storage; ECS requires a bucket
+export OUTPUT_BUCKET=your-bucket
 pytest -q
 
 docker build -t ecs-gpu-diffusers:local .
@@ -120,11 +120,14 @@ Instead of every GPU instance downloading `stabilityai/sdxl-turbo` from Hugging 
 Hugging Face ──(seed once)──► S3 (models/sdxl-turbo/) ──(instance boot sync via S3 gateway endpoint)──► /opt/models/sdxl-turbo ──► container /models/sdxl-turbo
 ```
 
-Seed the bucket **once** (needs internet + AWS credentials), after `terraform apply`:
+Seed the bucket **once** (needs internet + AWS credentials), after `terraform apply`. The bucket is auto-detected from the Terraform output, or pass it explicitly as the first argument:
 
 ```bash
-./scripts/seed-model.sh                 # bucket auto-detected from terraform output
-# or: ./scripts/seed-model.sh <bucket>
+./scripts/seed-model.sh
+```
+
+```bash
+./scripts/seed-model.sh <bucket>
 ```
 
 How it works:
@@ -162,13 +165,11 @@ git add -A && git commit -m "Initial ecs-gpu-diffusers MVP"
 git push origin main
 ```
 
-Then:
+Then (allow ~10 minutes for the instance to come up and the model to load):
 
 ```bash
-ALB=$(cd infra/terraform && terraform output -raw alb_url)
-KEY=$(cd infra/terraform && terraform output -raw api_key)
-
-# Allow ~10 minutes for instance + model load
+ALB=$(terraform -chdir=infra/terraform output -raw alb_url)
+KEY=$(terraform -chdir=infra/terraform output -raw api_key)
 curl -s "$ALB/health"
 curl -s "$ALB/ready"
 curl -s -X POST "$ALB/v1/images/generations" \
@@ -178,12 +179,19 @@ curl -s -X POST "$ALB/v1/images/generations" \
 ```
 
 ## Tear down everything
-+
-Removes ECS service (scaled to 0), empties S3/ECR, then `terraform destroy` for the full stack (VPC, ALB, g4dn ASG, IAM, logs, etc.):
+
+Removes ECS service (scaled to 0), empties S3/ECR, then `terraform destroy` for the full stack (VPC, ALB, g4dn ASG, IAM, logs, etc.).
+311
+Interactive (type `destroy` to confirm):
 
 ```bash
-./scripts/destroy-all.sh           # type 'destroy' to confirm
-./scripts/destroy-all.sh --yes     # no prompt
+./scripts/destroy-all.sh
+```
+
+Non-interactive (no prompt):
+
+```bash
+./scripts/destroy-all.sh --yes
 ```
 
 Requires `aws` + `terraform` and credentials for the account/region (`AWS_REGION` defaults to `us-east-1`).
